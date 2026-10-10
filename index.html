@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>つくし野アスレチック 攻略記録</title>
+    <style>
+        body { font-family: sans-serif; margin: 15px; background: #f4f4f4; color: #333; }
+        h1 { font-size: 1.2rem; text-align: center; }
+        .config-box, .history-box { background: #fff; padding: 10px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .config-box { text-align: center; }
+        .config-box input { padding: 5px; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+        .stage { background: #fff; padding: 10px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stage h2 { font-size: 1rem; color: #007BFF; border-bottom: 2px solid #007BFF; padding-bottom: 5px; }
+        label { display: block; padding: 8px; margin: 4px 0; background: #fafafa; border: 1px solid #ddd; border-radius: 4px; font-size: 0.95rem; }
+        label input { margin-right: 10px; transform: scale(1.2); }
+        .completed { background: #e8f5e9; border-color: #c8e6c9; text-decoration: line-through; color: #555; }
+        button { background: #007BFF; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        button:hover { background: #0056b3; }
+        .history-list { max-height: 150px; overflow-y: auto; font-size: 0.85rem; margin-top: 8px; border-top: 1px solid #eee; padding-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>🏃‍♂️ つくし野アスレチック 攻略記録</h1>
+
+    <!-- チャレンジ日の設定 -->
+    <div class="config-box">
+        <label for="challengeDate" style="display:inline; background:none; border:none; padding:0;">今回のチャレンジ：</label>
+        <input type="text" id="challengeDate" value="2026-10-10 第1回">
+    </div>
+
+    <!-- 過去の記録確認エリア -->
+    <div class="history-box">
+        <button onclick="loadHistory()">🔄 過去の記録を読み込む</button>
+        <div id="dateSelector" style="display:none; margin-top:10px; padding:10px; background:#f9f9f9; border-radius:4px;">
+            <label for="dateSelect" style="display:inline; background:none; border:none; padding:0; margin-right:8px; font-weight:bold;">チャレンジ日を選択：</label>
+            <select id="dateSelect" style="padding:5px; font-size:0.9rem; border:1px solid #ccc; border-radius:4px;"></select>
+            <button onclick="loadSelectedDate()" style="margin-left:8px;">📋 反映する</button>
+        </div>
+        <div id="historyList" class="history-list">まだ読み込まれていません</div>
+    </div>
+
+    <div id="app"></div>
+
+    <script>
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwayxI4hd_CCcyub2wOI_m9F-iDD5-UzkW24R1yIqSkL-Bsm7vE1jFdb6h716OYOmO7DA/exec"; // ←ご自身のURLに書き換えてください
+
+        let cachedHistory = null; // 過去の記録をキャッシュ
+
+        const stages = [
+            {
+                name: "ファーストステージ 東の山 (No.1-14)",
+                points: [
+                    "1. エコロジカルランニング", "2. 史蹟めぐり", "3. 朱印あるき", "4. 山すそのぼり",
+                    "5. 本堂まわり", "6. 上下鐘つき", "7. 入母屋わたり", "8. マッスルベル",
+                    "9. 房恒助け", "10. 青山街道あるき", "11. 宿場めぐり", "12. スパイダーウォーク",
+                    "13. 線路わたり", "14. 日記わたり"
+                ]
+            },
+            {
+                name: "セカンドステージ 池 (No.15-25)",
+                points: [
+                    "15. 厚木への道走り", "16. ひと休み", "17. 仲間入り", "18. たらいわたり",
+                    "19. いかだ走り", "20. つり橋わたり", "21. 水上つなわたり", "22. 池越えロープウエイ",
+                    "23. イカダ移り", "24. ボート乗り", "25. 丸太をのぼりネットをおりる"
+                ]
+            },
+            {
+                name: "サードステージ 西の山 (No.26-42)",
+                points: [
+                    "26. 昇って降りて×2", "27. 回転ネットまわし", "28. 額ぶちくぐり", "29. 開扉わたり",
+                    "30. ゆび猿", "31. 化石とび移り", "32. 東国飛行", "33. 山ごえ",
+                    "34. 炎のぼり", "35. 抱きつきわたり", "36. 境界あるき", "37. 峠ごえ",
+                    "38. 松の木のぼり", "39. 山ごもり", "40. 岩槻城一周", "41. いざ鎌倉へ", "42. クモの巣 脱出"
+                ]
+            },
+            {
+                name: "ファイナルステージ おどろき (No.43-50)",
+                points: [
+                    "43. 蛇くぐり", "44. 鎌倉道あるき", "45. ありじごく", "46. バイパスわたり",
+                    "47. 天国と地獄", "48. 腹とびつき", "49. ZiGuZaGuわたり", "50. 綱渡り"
+                ]
+            }
+        ];
+
+        const app = document.getElementById("app");
+
+        stages.forEach(stage => {
+            const stageDiv = document.createElement("div");
+            stageDiv.className = "stage";
+            const h2 = document.createElement("h2");
+            h2.textContent = stage.name;
+            stageDiv.appendChild(h2);
+
+            stage.points.forEach(pointText => {
+                const label = document.createElement("label");
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+
+// チェックボックスの変更イベント内
+checkbox.addEventListener("change", function() {
+    if(this.checked) {
+        label.classList.add("completed");
+    } else {
+        label.classList.remove("completed");
+    }
+
+    // チャレンジ日の値を取得
+    const challengeDateVal = document.getElementById("challengeDate").value;
+
+    // 送信データの形を明確にする
+    const payload = {
+        challengeDate: challengeDateVal,
+        pointNo: pointText.split(".")[0].trim(),
+        pointName: pointText,
+        status: this.checked ? "クリア" : "未クリア"
+    };
+
+    fetch(GAS_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    }).catch(err => console.error("送信エラー:", err));
+});
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(pointText));
+                stageDiv.appendChild(label);
+            });
+
+            app.appendChild(stageDiv);
+        });
+
+        // チャレンジ日の入力値が変わったらチェックをリセット
+        document.getElementById("challengeDate").addEventListener("change", function() {
+            const checkboxes = document.querySelectorAll("input[type='checkbox']");
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                checkbox.parentElement.classList.remove("completed");
+            });
+            alert("✅ チェックがリセットされました。新しいチャレンジの記録を始めます！");
+        });
+
+        // 過去の記録を読み込んで表示する関数
+        function loadHistory() {
+            const historyDiv = document.getElementById("historyList");
+            const dateSelector = document.getElementById("dateSelector");
+            historyDiv.textContent = "読み込み中...";
+            dateSelector.style.display = "none";
+
+            fetch(GAS_URL)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.result === "success" && data.history.length > 0) {
+                        cachedHistory = data.history;
+
+                        // 一意のチャレンジ日を取得（新しい順）
+                        const uniqueDates = [...new Set(data.history.map(item => item.challengeDate))];
+                        uniqueDates.sort().reverse();
+
+                        // セレクトボックスを更新
+                        const dateSelect = document.getElementById("dateSelect");
+                        dateSelect.innerHTML = "";
+                        uniqueDates.forEach(date => {
+                            const option = document.createElement("option");
+                            option.value = date;
+                            option.textContent = date;
+                            dateSelect.appendChild(option);
+                        });
+
+                        dateSelector.style.display = "block";
+
+                        // 一覧は表示しない
+                        historyDiv.textContent = "";
+                    } else {
+                        historyDiv.textContent = "まだ記録がありません。";
+                        dateSelector.style.display = "none";
+                    }
+                })
+                .catch(err => {
+                    historyDiv.textContent = "読み込みに失敗しました。";
+                    dateSelector.style.display = "none";
+                    console.error(err);
+                });
+        }
+
+        // 選択されたチャレンジ日の記録を読み込む
+        function loadSelectedDate() {
+            if (!cachedHistory) {
+                alert("⚠️ 記録がキャッシュされていません。先に「過去の記録を読み込む」をクリックしてください。");
+                return;
+            }
+
+            const selectedDate = document.getElementById("dateSelect").value;
+            const selectedRecords = cachedHistory.filter(item => item.challengeDate === selectedDate);
+
+            if (selectedRecords.length === 0) {
+                alert("⚠️ この日付の記録が見つかりません。");
+                return;
+            }
+
+            reflectHistoryToCheckboxes(selectedRecords, selectedDate);
+        }
+
+        // 履歴データをチェックボックスに反映する関数
+        function reflectHistoryToCheckboxes(records, selectedDate) {
+            // すべてのチェックボックスをリセット
+            document.querySelectorAll("input[type='checkbox']").forEach(checkbox => {
+                checkbox.checked = false;
+                checkbox.parentElement.classList.remove("completed");
+            });
+
+            // クリア状況の辞書を作成（ポイント番号 → true/false）
+            const clearStatus = {};
+            records.forEach(record => {
+                clearStatus[record.pointNo] = (record.status === "クリア");
+            });
+
+            // チェックボックスを更新
+            document.querySelectorAll("input[type='checkbox']").forEach(checkbox => {
+                const label = checkbox.parentElement;
+                const text = label.textContent.trim();
+                // テキストの先頭から数字を抽出（例：「1. エコロジカルランニング」→ 「1」）
+                const match = text.match(/^(\d+)\./);
+                if (match) {
+                    const pointNo = match[1];
+                    if (pointNo in clearStatus) {
+                        checkbox.checked = clearStatus[pointNo];
+                        if (clearStatus[pointNo]) {
+                            label.classList.add("completed");
+                        }
+                    }
+                }
+            });
+
+            const clearedCount = Object.values(clearStatus).filter(v => v).length;
+            alert(`✅ [${selectedDate}]の記録を反映しました（${clearedCount}/${records.length}制覇）`);
+        }
+    </script>
+</body>
+</html>
